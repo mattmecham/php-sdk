@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Patches (mmecham@invisionpower.com - May 2010)
+ * Patches (Matt Mecham - Invision Power Services - mmecham@invisionpower.com - May 2010)
  * - added verify peer for IIS/Windows CURL
  * - added non-curl fall back method in makeRequest
  */
@@ -502,7 +502,7 @@ class Facebook
    */
   protected function makeRequest($url, $params, $ch=null) {
     
-    if ( function_exists( 'curl_init' ) AND function_exists("curl_exec") )
+    if ( function_exists( 'curl_init' ) AND function_exists("curl_exec") AND function_exists('curl_setopt_array') )
 	{
 	    if (!$ch) {
 	      $ch = curl_init();

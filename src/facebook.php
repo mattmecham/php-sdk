@@ -1,8 +1,11 @@
 <?php
 
-if (!function_exists('curl_init')) {
-  throw new Exception('Facebook needs the CURL PHP extension.');
-}
+/**
+ * Patches (mmecham@invisionpower.com - May 2010)
+ * - added verify peer for IIS/Windows CURL
+ * - added non-curl fall back method in makeRequest
+ */
+
 if (!function_exists('json_decode')) {
   throw new Exception('Facebook needs the JSON PHP extension.');
 }
@@ -498,28 +501,106 @@ class Facebook
    * @return String the response text
    */
   protected function makeRequest($url, $params, $ch=null) {
-    if (!$ch) {
-      $ch = curl_init();
-    }
-
-    $opts = self::$CURL_OPTS;
-    $opts[CURLOPT_POSTFIELDS] = $params;
-    $opts[CURLOPT_URL] = $url;
-    curl_setopt_array($ch, $opts);
-    $result = curl_exec($ch);
-    if ($result === false) {
-      $e = new FacebookApiException(array(
-        'error_code' => curl_errno($ch),
-        'error'      => array(
-          'message' => curl_error($ch),
-          'type'    => 'CurlException',
-        ),
-      ));
-      curl_close($ch);
-      throw $e;
-    }
-    curl_close($ch);
-    return $result;
+    
+    if ( function_exists( 'curl_init' ) AND function_exists("curl_exec") )
+	{
+	    if (!$ch) {
+	      $ch = curl_init();
+	    }
+	    $opts = self::$CURL_OPTS;
+	    $opts[CURLOPT_POSTFIELDS] = $params;
+	    $opts[CURLOPT_URL] = $url;
+	    
+	    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Expect:'));
+	    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+	
+	    curl_setopt_array($ch, $opts);
+	    $result = curl_exec($ch);
+	    if ($result === false) {
+	      $e = new FacebookApiException(array(
+	        'error_code' => curl_errno($ch),
+	        'error'      => array(
+	          'message' => curl_error($ch),
+	          'type'    => 'CurlException',
+	        ),
+	      ));
+	      curl_close($ch);
+	      throw $e;
+	    }
+	    curl_close($ch);
+	    return $result;
+	}
+	else
+	{
+		$url_parts  = @parse_url($url);
+		$postfields = http_build_query( $params );
+		
+		if ( ! $postfields )
+		{
+			$postfields = str_replace( '&amp;', '&', $url_parts['query'] );
+		}
+		
+		/* Use SSL rather than https */
+		$url_parts['scheme'] = ( $url_parts['scheme'] == 'https' ) ? 'ssl' : $url_parts['scheme'];
+		
+		$host = $url_parts['scheme'] . '://' . $url_parts['host'];
+	 	$port = ( isset($url_parts['port']) ) ? $url_parts['port'] : ( $url_parts['scheme'] == 'https' || $url_parts['scheme'] == 'ssl' ? 443 : 80 );
+	 	
+	 	if ( !empty( $url_parts["path"] ) )
+		{
+			$path = $url_parts["path"];
+		}
+		else
+		{
+			$path = "/";
+		}
+		
+		$header  = "POST {$path} HTTP/1.0\r\n";
+		$header .= "Host: " . str_replace( array( 'http://', 'https://', 'ssl://' ), '', $host ) . "\r\n";
+		$header .= "Content-Type: application/x-www-form-urlencoded\r\n";
+		$header .= "Content-Length: " . strlen($postfields) . "\r\n\r\n";
+		
+		if ( $fp = fsockopen( $host, $port, $errno, $errstr, 60 ) )
+		{
+			socket_set_timeout($fp, 60);
+			
+			fwrite($fp, $header . $postfields);
+			
+			while( ! feof($fp) && ! $status['timed_out'] )		
+			{
+		  		$data .= fgets ($fp,8192);
+		  		$status  = stream_get_meta_data($fp);
+			}
+			
+			fclose($fp);
+	 	}		
+		
+		/* Strip headers HTTP/1.1 ### ABCD */
+		$httpCode     = substr( $data, 9, 3 );
+		$lastApiCall = $url;
+		
+		/* Chuncked? */
+		
+		$_chunked	= false;
+		
+		if( preg_match( "/Transfer\-Encoding:\s*chunked/i", $data ) )
+		{
+			$_chunked	= true;
+		}
+		
+		$tmp	= split("\r\n\r\n", $data, 2);
+		$data	= trim($tmp[1]);
+		
+		if ( $_chunked )
+		{
+			$lines	= explode( "\n", $data );
+			array_pop($lines);
+			array_shift($lines);
+			$data	= implode( "\n", $lines );
+		}
+		
+		return $data;
+	}
   }
 
   /**

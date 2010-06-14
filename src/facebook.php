@@ -547,8 +547,10 @@ class Facebook
 		
 		if ( ! $postfields )
 		{
-			$postfields = str_replace( '&amp;', '&', $url_parts['query'] );
+			$postfields = $url_parts['query'];
 		}
+		
+		$postfields = str_replace( '&amp;', '&', $postfields );
 		
 		/* Use SSL rather than https */
 		$url_parts['scheme'] = ( $url_parts['scheme'] == 'https' ) ? 'ssl' : $url_parts['scheme'];

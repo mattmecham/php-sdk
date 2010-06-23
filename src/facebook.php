@@ -517,14 +517,19 @@ class Facebook
 
       $result = curl_exec($ch);
 
-      if (curl_errno($ch) == 60) { // CURLE_SSL_CACERT
-        if (defined('CA_BUNDLE_PATH')) {
-          curl_setopt($ch, CURLOPT_CAINFO, CA_BUNDLE_PATH);
-        } else {
-          curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        }
-        $result = curl_exec($ch);
-      }
+      if (curl_errno($ch) == 60 ||  curl_errno( $ch ) == 77)
+      { // CURLE_SSL_CACERT
+          if ( defined('CA_BUNDLE_PATH') )
+          {
+          	curl_setopt($ch, CURLOPT_CAINFO, CA_BUNDLE_PATH);
+          }
+          else
+          {
+          	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+       	  }
+       		
+           $result = curl_exec($ch);
+	 }
 
       if ($result === false) {
 	      $e = new FacebookApiException(array(

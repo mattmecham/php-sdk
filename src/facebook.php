@@ -530,6 +530,20 @@ class Facebook
        		
            $result = curl_exec($ch);
 	 }
+      // name lookup timed out / DNS issues
+		else if ( curl_errno( $ch ) == 6 )
+		{ 
+			$url_parts  = @parse_url($url);
+			$ip         = @gethostbyname( $url_parts['host'] );
+			
+			if ( $ip and preg_match( "#^\d{1,3}\.#", $ip ) )
+			{
+				// Turn of verify SSL as the IP will not match domain of cert
+				curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+				curl_setopt($ch, CURLOPT_URL, $url_parts['scheme'] . '://' . $ip . '/' . $url_parts['path'] );
+				$result = curl_exec($ch);
+			}
+		}
 
       if ($result === false) {
 	      $e = new FacebookApiException(array(

@@ -29,10 +29,8 @@ if ($session) {
   }
 }
 
-// login or logout url will be needed depending on current user state.
-if ($me) {
-  $logoutUrl = $facebook->getLogoutUrl();
-} else {
+// login url will be needed depending on current user state.
+if (!$me) {
   $loginUrl = $facebook->getLoginUrl();
 }
 
@@ -73,10 +71,12 @@ $naitik = $facebook->api('/naitik');
           xfbml   : true // parse XFBML
         });
 
-        // whenever the user logs in, we refresh the page
-        FB.Event.subscribe('auth.login', function() {
+        // whenever the user logs in/out, we refresh the page
+        var reload = function() {
           window.location.reload();
-        });
+        };
+        FB.Event.subscribe('auth.login', reload);
+        FB.Event.subscribe('auth.logout', reload);
       };
 
       (function() {
@@ -91,7 +91,7 @@ $naitik = $facebook->api('/naitik');
     <h1><a href="example.php">php-sdk</a></h1>
 
     <?php if ($me): ?>
-    <a href="<?php echo $logoutUrl; ?>">
+    <a href="#" onclick="FB.logout();return false;">
       <img src="http://static.ak.fbcdn.net/rsrc.php/z2Y31/hash/cxrz4k7j.gif">
     </a>
     <?php else: ?>

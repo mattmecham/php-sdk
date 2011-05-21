@@ -704,6 +704,7 @@ class Facebook
     // prepend dot if a domain is found
     if ($domain) {
       $domain = '.' . $domain;
+      if ($domain == '.localhost') $domain = false;
     }
 
     // if an existing cookie is not set, we dont need to delete it
